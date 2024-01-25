@@ -1,0 +1,229 @@
+library(readr)
+parking_meter_raw <- read_csv("Desktop/Desktop - Carlos’s MacBook Pro/Data Projects/parking_meter_raw.csv")
+
+#dataset imported
+View(parking_meter_raw)
+
+#make copy
+pm_line <- parking_meter_raw
+
+#view dataset
+View(pm_line)
+
+#install data manipulation package
+install.packages("tidyr")
+library(tidyr)
+
+install.packages("ggplot2")
+library(ggplot2)
+
+install.packages("dplyr") 
+library(dplyr) 
+#//------------------------------------
+#understand column names
+colnames(pm_line)
+
+#seperate data from time into columns
+pm_line_1 <- tidyr::separate(pm_line, col = date_trans_start, 
+                             into = c("date_start", "time_start"), sep = 11)
+pm_line_2 <- tidyr::separate(pm_line_1, col = date_meter_expire, 
+                             into = c("date_end", "time_end"), sep = 11)
+
+#confirm
+colnames(pm_line_2)
+#Question 1: Peak hourly looking at start time
+
+#make copy
+pm_hour <- pm_line_2
+
+#seperate time start into a new column using gsub()
+pm_hour$start_time_hour <- gsub("^([0-9]{2}).*", "\\1", pm_hour$time_start)
+
+#using group_by() to group columns, count() to count total of eveery hour
+#using summarise to get output of all hours
+#using :: because r studio failed to load packages
+pm_hour <- dplyr::summarise(dplyr::group_by(pm_hour, start_time_hour), count = dplyr::n())
+
+ggplot2::ggplot(pm_hour, ggplot2::aes(x = start_time_hour, y = count, group = 1)) +
+  ggplot2::geom_bar(stat = "identity", fill = "light blue") +
+  ggplot2::labs(x = "Start Time Hour", y = "Count", title = "Parking Meters: Busiest Start Hours") +
+  ggplot2::scale_y_continuous(labels = function(x) format(x, big.mark = ",", scientific = FALSE))
+
+#//------------------------------------
+#1.B: Peak hourly looking at end time
+colnames(pm_line_2)
+
+pm_hour_exp <- pm_line_2
+
+View(pm_hour_exp)
+
+pm_hour_exp$end_time_hour <- gsub("^([0-9]{2}).*", "\\1", pm_hour_exp$time_end)
+
+View(pm_hour_exp)
+
+pm_hour_exp <- dplyr::summarise(dplyr::group_by(pm_hour_exp, end_time_hour), count = dplyr::n())
+
+ggplot2::ggplot(pm_hour_exp, ggplot2::aes(x = end_time_hour, y = count, group = 1)) +
+  ggplot2::geom_bar(stat = "identity", fill = "blue") +
+  ggplot2::labs(x = "End Time Hour", y = "Count", title = "Parking Meters: Busiest Expired Hours") +
+  ggplot2::scale_y_continuous(labels = function(x) format(x, big.mark = ",", scientific = FALSE))
+
+
+#//---------------------------------
+#Q2: busiest day of the week
+
+View(pm_line_2)
+
+#grab column from dataset
+date_to_day <- pm_line_2$date_start
+
+#convert column to string
+date_to_day_obj <- as.Date(date_to_day)
+
+#using weekdays function to get day of the week
+day_of_week <- weekdays(date_to_day_obj)
+
+#confirm info
+print(day_of_week)
+
+#make table so insight and viz can be made
+day_of_week_table <- table(day_of_week)
+
+#convert from table to dataframe so i can make the barplot
+day_of_week_df <- as.data.frame(day_of_week_table)
+
+#using as.factor to make day_of_week into a factor
+day_of_week_df$day_of_week <- as.factor(day_of_week_df$day_of_week)
+
+#using as.numeric to make the Freq column numeric
+day_of_week_df$Freq <- as.numeric(as.character(day_of_week_df$Freq))
+
+names(day_of_week_df)
+
+#viz showing barplot
+
+ggplot2::ggplot(day_of_week_df, ggplot2::aes(x = reorder(day_of_week, -Freq), y = Freq)) + 
+  ggplot2::geom_bar(stat = "identity", fill = "light blue") +
+  ggplot2::labs(title = "Parking Meters: Busiest Days of the Week",
+       x = "Day of the Week",
+       y = "Count")
+
+#//---------------------------------
+#Q3: Busiest month of the year
+
+View(pm_line_2)
+
+#grab column from dataset
+date_to_month <- pm_line_2$date_start
+
+#convert column to string
+date_to_month_obj <- as.Date(date_to_day)
+
+#using month() function to get day of the week
+month_of_year <- months(date_to_day_obj)
+
+#confirm info
+print(month_of_year)
+
+#make table so insight and viz can be made
+month_of_year_table <- table(month_of_year)
+
+#convert from table to dataframe so i can make the barplot
+month_of_year_df <- as.data.frame(month_of_year_table)
+
+#names() used to get names of columns to bypass typos for next funtion
+names(month_of_year_df)
+
+#using as.factor to make day_of_week into a factor
+month_of_year_df$month_of_year <- as.factor(month_of_year_df$month_of_year)
+
+#using as.numeric to make the Freq column numeric
+month_of_year_df$Freq <- as.numeric(as.character(month_of_year_df$Freq))
+
+#barplot
+ggplot2::ggplot(month_of_year_df, ggplot2::aes(x = reorder(month_of_year, -Freq), y = Freq)) + 
+  ggplot2::geom_bar(stat = "identity", fill = "blue") +
+  ggplot2::labs(title = "Parking Meters: Busiest Month in 2023",
+                x = "Month",
+                y = "Count")+
+  ggplot2::scale_y_continuous(labels = function(x) format(x, big.mark = ",", scientific = FALSE))
+
+#//--------------------------------------------------------------
+#Q4: Revenue analysis: how much revenue did each month generate and what
+#are the prefered payment methods?
+
+#using subset() to grab columns from dataset. since it is more than one
+#i cant use $ like before
+month_pmt <- subset(pm_line_2, select = c(date_start,trans_amt,pay_method))
+
+#using as.date to ensure date is in date format
+month_pmt$date_start <- as.Date(month_pmt$date_start, format = "%Y-%m-%d")
+
+#using months() to make column from date to month
+month_pmt$date_start <- months(month_pmt$date_start)
+
+#copy of dataset to perform a plot
+month_pmt_line <- month_pmt
+
+#using summarise() with dplyr() to group all months while summing the revenue
+month_pmt_line <- dplyr::summarise(dplyr::group_by(month_pmt_line, date_start), 
+                                   trans_amt = sum(trans_amt))
+
+#using levels() to specify how i want to the order of months to be set
+#using factor() to to convert column into factor so I can use it as categorical data
+month_pmt_line$date_start <- factor(month_pmt_line$date_start, levels = c("January", "February", 
+                                                                          "March", "April", "May", 
+                                                                          "June", "July", "August", 
+                                                                          "September", "October", 
+                                                                          "November", "December"))
+
+#using order() to make the changes onto the dataset and apply it to the same dataset
+month_pmt_line <- month_pmt_line[order(month_pmt_line$date_start),]
+
+#confirm new order
+print(month_pmt_line)
+
+#names used to ensure no typos are made when making line plot
+names(month_pmt_line)
+
+#line plot
+ggplot2::ggplot(month_pmt_line, ggplot2::aes(x = date_start, y = trans_amt, group = 1)) + 
+  ggplot2::geom_line(color = "blue") +
+  ggplot2::geom_point() +
+  ggplot2::geom_text(ggplot2::aes(label = format(trans_amt / 100, 
+                      big.mark = ",", 
+                      scientific = FALSE)), 
+                     check_overlap = TRUE, 
+                     vjust = -1) +
+  ggplot2::labs(title = "Parking Meters: Revenue (2023)",
+                x = "Month",
+                y = "Revenue")+
+  ggplot2::scale_y_continuous(labels = function(x) format(x/100, big.mark = ",", scientific = FALSE))
+
+#//--------------------------------------------------------------
+#Q5: What form of payment is more common? Pie chart
+View(pm_line_2)
+
+form_pmt <- pm_line_2$pay_method
+
+form_pmt_table <- table(form_pmt)
+
+colnames(form_pmt_table)
+
+form_pmt_df <- as.data.frame(form_pmt_table)
+
+form_pmt_df$form_pmt <- as.factor(form_pmt_df$form_pmt)
+form_pmt_df$Freq <- as.numeric(form_pmt_df$Freq)
+
+View(form_pmt_df)
+
+ggplot2::ggplot(form_pmt_df, ggplot2::aes(x = "", y = Freq, fill = form_pmt)) +
+  ggplot2::geom_bar(width = 1, stat = "identity", color = "black") +
+  ggplot2::coord_polar("y", start = 0) +
+  ggplot2::labs(fill = "Form of Payment", title = "Parking Meter: Payment Form") + 
+  ggplot2::theme(legend.position = c(.95,0.25), 
+        axis.text = ggplot2::element_blank(),
+        axis.title = ggplot2::element_blank(),
+        panel.grid = ggplot2::element_blank()) +
+  ggplot2::geom_text(ggplot2::aes(label = Freq), nudge_x = .60)
+
